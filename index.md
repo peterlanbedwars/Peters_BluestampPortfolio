@@ -56,34 +56,366 @@ Here's where you'll put images of your schematics. [Tinkercad](https://www.tinke
 Here's where you'll put your code. The syntax below places it into a block of code. Follow the guide [here]([url](https://www.markdownguide.org/extended-syntax/)) to learn how to customize it to your project needs. 
 
 ```c++
+#include <Adafruit_LSM6DS3TRC.h>
+#include <Adafruit_LIS3MDL.h>
+#include <Adafruit_Sensor.h>
+
+const int flexPin0 = A6;
+const int buzzerPin = 3;
+
+int rawValue;
+int angle;
+
+const int flatValue = 520;
+const int bentValue = 950;      
+const int triggerAngle = 65;
+const int buzzFrequency = 1000;
+const int maxAngle = 130;
+
+// --- IMU objects ---
+Adafruit_LSM6DS3TRC lsm6ds;
+Adafruit_LIS3MDL lis3mdl;
+
+const unsigned long recordDuration = 5000;    
+const unsigned long flexRecordDuration = 10000; 
+const int sampleDelay = 50;
+
+const float GRAVITY = 9.81; 
+
+
+const float baseline_angleMin = 0.0;
+const float baseline_angleMax = 130.0;
+
+
+const float baseline_velocity_walking_low = 95.0;
+const float baseline_velocity_walking_high = 100.0;
+const float baseline_velocity_loading = 200.0;
+const float baseline_velocity_stance = 100.0;
+const float baseline_velocity_swing_low = 350.0;
+const float baseline_velocity_swing_high = 400.0;
+
+
+const float baseline_linAccel_swing_low = 10.0;
+const float baseline_linAccel_swing_high = 15.0;
+const float baseline_linAccel_impact_low = 26.0;
+const float baseline_linAccel_impact_high = 36.0;
+
+
+enum Phase { WALKING, LOADING, STANCE, SWING, IMPACT };
+Phase currentPhase = WALKING;
+
 void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(9600);
-  Serial.println("Hello World!");
+  Serial.begin(115200);
+  while (!Serial) delay(10);
+
+  pinMode(buzzerPin, OUTPUT);
+
+  if (!lsm6ds.begin_I2C()) {
+    Serial.println("Failed to find LSM6DS3TR-C chip");
+  }
+  if (!lis3mdl.begin_I2C()) {
+    Serial.println("Failed to find LIS3MDL chip");
+  }
+
+  Serial.println("Setup complete.");
+  printMenu();
+}
+
+void printMenu() {
+  Serial.println("\nCommands:");
+  Serial.println("  go         - gyro/accel recording (5s)");
+  Serial.println("  go2        - flex sensor angle recording (10s)");
+  Serial.println("  phase walking / loading / stance / swing / impact");
+  Serial.println("         - sets which baseline to compare against before your next 'go'");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  rawValue = analogRead(flexPin0);
+  angle = map(rawValue, flatValue, bentValue, 0, maxAngle);
+  angle = constrain(angle, 0, maxAngle);
 
+  if (angle >= triggerAngle) {
+    tone(buzzerPin, buzzFrequency);
+  } else {
+    noTone(buzzerPin);
+  }
+
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+
+    if (command.equalsIgnoreCase("go")) {
+      recordSession();
+    } else if (command.equalsIgnoreCase("go2")) {
+      recordFlexSession();
+    } else if (command.startsWith("phase ")) {
+      setPhase(command.substring(6));
+    }
+  }
+
+  delay(100);
+}
+
+void setPhase(String phaseName) {
+  phaseName.trim();
+  if (phaseName.equalsIgnoreCase("walking")) {
+    currentPhase = WALKING;
+    Serial.println("Phase set to: WALKING");
+  } else if (phaseName.equalsIgnoreCase("loading")) {
+    currentPhase = LOADING;
+    Serial.println("Phase set to: LOADING");
+  } else if (phaseName.equalsIgnoreCase("stance")) {
+    currentPhase = STANCE;
+    Serial.println("Phase set to: STANCE");
+  } else if (phaseName.equalsIgnoreCase("swing")) {
+    currentPhase = SWING;
+    Serial.println("Phase set to: SWING");
+  } else if (phaseName.equalsIgnoreCase("impact")) {
+    currentPhase = IMPACT;
+    Serial.println("Phase set to: IMPACT");
+  } else {
+    Serial.println("Unknown phase. Use: walking, loading, stance, swing, impact");
+  }
+}
+
+float getLinearAccelMag(sensors_event_t &accel) {
+  float magWithGravity = sqrt(sq(accel.acceleration.x) + sq(accel.acceleration.y) + sq(accel.acceleration.z));
+  float movementOnly = magWithGravity - GRAVITY;
+  return abs(movementOnly);
+}
+
+void recordSession() {
+  Serial.print("Gyro/Accel recording started... Phase: ");
+  printPhaseName();
+
+  sensors_event_t accel, gyro, temp, mag;
+
+  lsm6ds.getEvent(&accel, &gyro, &temp);
+  float gyroZ_initial_dps = gyro.gyro.z * 57.2958; 
+  float accelMag_initial = getLinearAccelMag(accel);
+
+  float velocity_sum = 0;
+  float accelMag_sum = 0;
+  float accelMag_max = 0;
+  int sampleCount = 0;
+
+  float velocity_final_dps = gyroZ_initial_dps;
+  float accelMag_final = accelMag_initial;
+
+  unsigned long startTime = millis();
+
+  while (millis() - startTime < recordDuration) {
+    rawValue = analogRead(flexPin0);
+    angle = map(rawValue, flatValue, bentValue, 0, maxAngle);
+    angle = constrain(angle, 0, maxAngle);
+
+    if (angle >= triggerAngle) {
+      tone(buzzerPin, buzzFrequency);
+    } else {
+      noTone(buzzerPin);
+    }
+
+    lsm6ds.getEvent(&accel, &gyro, &temp);
+
+    float currentVelocity_dps = gyro.gyro.z * 57.2958;
+    float currentAccelMag = getLinearAccelMag(accel);
+
+    Serial.print("Velocity: ");
+    Serial.print(currentVelocity_dps);
+    Serial.print(" deg/s   Accel: ");
+    Serial.print(currentAccelMag);
+    Serial.println(" m/s^2");
+
+    velocity_sum += abs(currentVelocity_dps);
+    accelMag_sum += currentAccelMag;
+    if (currentAccelMag > accelMag_max) accelMag_max = currentAccelMag;
+
+    velocity_final_dps = currentVelocity_dps;
+    accelMag_final = currentAccelMag;
+
+    sampleCount++;
+    delay(sampleDelay);
+  }
+
+  float velocity_avg_dps = velocity_sum / sampleCount;
+  float accelMag_avg = accelMag_sum / sampleCount;
+
+  Serial.println("--- Gyro/Accel recording complete ---");
+  Serial.print("Samples collected: "); Serial.println(sampleCount);
+
+  Serial.println("\nAngular velocity (deg/s, |Z axis|):");
+  Serial.print("  Initial: "); Serial.println(abs(gyroZ_initial_dps));
+  Serial.print("  Final:   "); Serial.println(abs(velocity_final_dps));
+  Serial.print("  Average: "); Serial.println(velocity_avg_dps);
+
+  Serial.println("\nLinear acceleration magnitude, movement-only (m/s^2):");
+  Serial.print("  Initial: "); Serial.println(accelMag_initial);
+  Serial.print("  Final:   "); Serial.println(accelMag_final);
+  Serial.print("  Average: "); Serial.println(accelMag_avg);
+  Serial.print("  Peak:    "); Serial.println(accelMag_max);
+
+  compareVelocityToBaseline(velocity_avg_dps);
+  compareLinAccelToBaseline(accelMag_avg, accelMag_max);
+
+  Serial.println("\nType 'go' or 'go2' to record again.");
+}
+void recordFlexSession() {
+  Serial.println("Flex sensor recording started...");
+
+  long angleSum = 0;
+  int sampleCount = 0;
+  int angle_initial = 0;
+  int angle_final = 0;
+  int angle_max = 0;
+
+  unsigned long startTime = millis();
+
+  while (millis() - startTime < flexRecordDuration) {
+    rawValue = analogRead(flexPin0);
+    angle = map(rawValue, flatValue, bentValue, 0, maxAngle);
+    angle = constrain(angle, 0, maxAngle);
+
+    if (angle >= triggerAngle) {
+      tone(buzzerPin, buzzFrequency);
+    } else {
+      noTone(buzzerPin);
+    }
+
+    Serial.print("Raw: ");
+    Serial.print(rawValue);
+    Serial.print("  Angle: ");
+    Serial.println(angle);
+
+    if (sampleCount == 0) {
+      angle_initial = angle;
+    }
+    angle_final = angle;
+    if (angle > angle_max) angle_max = angle;
+
+    angleSum += angle;
+    sampleCount++;
+
+    delay(sampleDelay);
+  }
+
+  float angle_avg = (float)angleSum / sampleCount;
+
+  Serial.println("--- Flex sensor recording complete ---");
+  Serial.print("Samples collected: "); Serial.println(sampleCount);
+  Serial.print("Initial angle: "); Serial.println(angle_initial);
+  Serial.print("Final angle: "); Serial.println(angle_final);
+  Serial.print("Average angle: "); Serial.println(angle_avg);
+  Serial.print("Peak angle this session: "); Serial.println(angle_max);
+
+  compareAngleToBaseline(angle_max);
+
+  Serial.println("\nType 'go' or 'go2' to record again.");
+}
+
+
+void printPhaseName() {
+  switch (currentPhase) {
+    case WALKING: Serial.println("WALKING"); break;
+    case LOADING: Serial.println("LOADING"); break;
+    case STANCE: Serial.println("STANCE"); break;
+    case SWING: Serial.println("SWING"); break;
+    case IMPACT: Serial.println("IMPACT"); break;
+  }
+}
+
+void compareVelocityToBaseline(float measured_dps) {
+  float low = 0, high = 0;
+  String label = "";
+
+  switch (currentPhase) {
+    case WALKING:
+      low = baseline_velocity_walking_low; high = baseline_velocity_walking_high; label = "walking baseline";
+      break;
+    case LOADING:
+      low = baseline_velocity_loading; high = baseline_velocity_loading; label = "loading phase baseline";
+      break;
+    case STANCE:
+      low = baseline_velocity_stance; high = baseline_velocity_stance; label = "stance phase baseline";
+      break;
+    case SWING:
+      low = baseline_velocity_swing_low; high = baseline_velocity_swing_high; label = "swing phase baseline";
+      break;
+    default:
+      Serial.println("\n(No angular velocity baseline set for this phase)");
+      return;
+  }
+
+  Serial.print("\nComparing avg velocity to "); Serial.print(label);
+  Serial.print(" ("); Serial.print(low); Serial.print("-"); Serial.print(high); Serial.println(" deg/s):");
+
+  if (measured_dps < low) {
+    Serial.print("  Below baseline range by "); Serial.print(low - measured_dps); Serial.println(" deg/s");
+  } else if (measured_dps > high) {
+    Serial.print("  Above baseline range by "); Serial.print(measured_dps - high); Serial.println(" deg/s");
+  } else {
+    Serial.println("  Within baseline range");
+  }
+}
+
+void compareLinAccelToBaseline(float avgAccel, float peakAccel) {
+  float low = 0, high = 0;
+  String label = "";
+
+  switch (currentPhase) {
+    case SWING:
+      low = baseline_linAccel_swing_low; high = baseline_linAccel_swing_high; label = "swing-phase linear accel baseline";
+      break;
+    case IMPACT:
+      low = baseline_linAccel_impact_low; high = baseline_linAccel_impact_high; label = "impact-strike linear accel baseline";
+      break;
+    default:
+      Serial.println("(No linear acceleration baseline set for this phase - use 'phase swing' or 'phase impact')");
+      return;
+  }
+
+  Serial.print("Comparing peak linear accel to "); Serial.print(label);
+  Serial.print(" ("); Serial.print(low); Serial.print("-"); Serial.print(high); Serial.println(" m/s^2):");
+
+  if (peakAccel < low) {
+    Serial.print("  Below baseline range by "); Serial.print(low - peakAccel); Serial.println(" m/s^2");
+  } else if (peakAccel > high) {
+    Serial.print("  Above baseline range by "); Serial.print(peakAccel - high); Serial.println(" m/s^2");
+  } else {
+    Serial.println("  Within baseline range");
+  }
+}
+
+void compareAngleToBaseline(int measuredAngle) {
+  Serial.print("\nComparing to healthy ROM baseline (");
+  Serial.print(baseline_angleMin); Serial.print("-"); Serial.print(baseline_angleMax);
+  Serial.println(" deg):");
+
+  if (measuredAngle < baseline_angleMin) {
+    Serial.println("  Below healthy range");
+  } else if (measuredAngle > baseline_angleMax) {
+    Serial.println("  Above healthy range");
+  } else {
+    Serial.print("  Within healthy range, reaching ");
+    Serial.print((measuredAngle / baseline_angleMax) * 100);
+    Serial.println("% of max healthy ROM");
+  }
 }
 ```
 
 # Bill of Materials
-Here's where you'll list the parts in your project. To add more rows, just copy and paste the example rows below.
-Don't forget to place the link of where to buy each component inside the quotation marks in the corresponding row after href =. Follow the guide [here]([url](https://www.markdownguide.org/extended-syntax/)) to learn how to customize this to your project needs. 
 
 | **Part** | **Note** | **Price** | **Link** |
 |:--:|:--:|:--:|:--:|
-| Arduinio Nano Esp32 | The micro controller that connects gyroscope, accelarometer, and flex sensor | $14.64 | <a href="[https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://store-usa.arduino.cc/products/nano-esp32)"> Link </a> |
-| Adafruit LSM6DS3TR-C+LIS3MDL Accelerometer | tracks the angular velocity along with the acceration from the x,y, and z axis | $3.33 | <a href="[https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://www.adafruit.com/product/5543?gad_source=1&gclid=Cj0KCQjwhb60BhClARIsABGGtw8-jY7wSMWS0FXfzOjqk8mHnPteYpW1C7iLXs6zfJK6qxsxANZ_MVoaAqhWEALw_wcB)"> Link </a> |
-| Flex Sensor(4.5”) | measures the degree of the angle the knee is bending| $17.95 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/"> Link </a> |
-| Item Name | What the item is used for | $Price | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/"> Link </a> |
-| Item Name | What the item is used for | $Price | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/"> Link </a> |
-| Item Name | What the item is used for | $Price | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/"> Link </a> |
-| Item Name | What the item is used for | $Price | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/"> Link </a> |
-| Item Name | What the item is used for | $Price | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/"> Link </a> |
-| Item Name | What the item is used for | $Price | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/"> Link </a> |
-| Item Name | What the item is used for | $Price | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/"> Link </a> |
+| Arduinio Nano Esp32 | The micro controller that connects gyroscope, accelarometer, and flex sensor | $14.64 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://store-usa.arduino.cc/products/nano-esp32)"> Link </a> |
+| Adafruit LSM6DS3TR-C+LIS3MDL Accelerometer | tracks the angular velocity along with the acceration from the x,y, and z axis | $3.33 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://www.adafruit.com/product/5543?gad_source=1&gclid=Cj0KCQjwhb60BhClARIsABGGtw8-jY7wSMWS0FXfzOjqk8mHnPteYpW1C7iLXs6zfJK6qxsxANZ_MVoaAqhWEALw_wcB)"> Link </a> |
+| Flex Sensor(4.5”) | measures the degree of the angle the knee is bending| $17.95 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://www.sparkfun.com/flex-sensor-4-5.html)"> Link </a> |
+| Knee Compression Sleeve | Holds components in place and attached to the knee | $7.99 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://www.amazon.com/Compression-Sleeve-Support-Running-Medium/dp/B0987XN6QH/ref=sr_1_1_sspa?crid=1YPAWDY72UPC4&keywords=knee%2Bsleeve&qid=1685066084&sprefix=knee%2Bsleev%2Caps%2C182&sr=8-1-spons&spLa=ZW5jcnlwdGVkUXVhbGlmaWVyPUEzRjkzWEExWDZSMEEwJmVuY3J5cHRlZElkPUEwMDE2MDE5NjNVMTlUWTBNNUkzJmVuY3J5cHRlZEFkSWQ9QTAwNjE5MDYzTDhJTE1IWFZaRUNVJndpZGdldE5hbWU9c3BfYXRmJmFjdGlvbj1jbGlja1JlZGlyZWN0JmRvTm90TG9nQ2xpY2s9dHJ1ZQ&th=1)"> Link </a> |
+| 5000 mAh Power Bank (10cm x 3 cm) | powers everything | $17.99 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://www.amazon.com/Anker-PowerCore-Ultra-Compact-High-Speed-Technology/dp/B01CU1EC6Y/ref=asc_df_B01CU1EC6Y/?tag=hyprod-20&linkCode=df0&hvadid=312111908612&hvpos=&hvnetw=g&hvrand=17851029625711693156&hvpone=&hvptwo=&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=9061320&hvtargid=pla-523807968135&th=1)"> Link </a> |
+| Sewing Kit | sews everything together | $6.99 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://www.amazon.com/Coquimbo-Traveler-Beginner-Emergency-Organizer/dp/B01G3LOLD6/ref=sr_1_7?crid=27CESEBIVTX3Z&keywords=sewing%2Bkit&qid=1689572065&sprefix=sewing%2Bk%2Caps%2C192&sr=8-7&th=1)"> Link </a> |
+| 30AWG Tinned Copper Silicone Hook Up Wire | connects everything via soldering | $12.99 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://www.amazon.com/StrivedayTM-Flexible-Silicone-electronic-electrics/dp/B01KQ2JNLI?th=1)"> Link </a> |
+| USB Cable for Arduino | connects arduino to power source | $7.00 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://www.amazon.com/USB-2-0-Cable-Type-M000006/dp/B013EOQUAW/ref=sr_1_4?keywords=Arduino+uno+cable&qid=1689572328&sr=8-4)"> Link </a> |
+| PCB Board | allows wiring to be connected to arduino | $3.43 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://www.amazon.com/ELEGOO-Prototype-Soldering-Compatible-Arduino/dp/B072Z7Y19F/ref=sr_1_12_sspa?crid=3OPU9MWHCVIKU&keywords=perf+board&qid=1689572424&sprefix=perf+boar%2Caps%2C174&sr=8-12-spons&sp_csd=d2lkZ2V0TmFtZT1zcF9tdGY&psc=1)"> Link </a> |
+| Piezzo Buzzer | Buzzes when form is bad | $1.33 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://www.amazon.com/Stemedu-SFM-20B-Electric-DC3-24V-Continuous/dp/B0BFHBXKND/ref=sr_1_4?crid=61ZO1XM97XPB&keywords=piezo+buzzer&qid=1689572505&sprefix=piezo+buz%2Caps%2C236&sr=8-4)"> Link </a> |
 
 
 # Other Resources/Examples
