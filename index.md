@@ -1,6 +1,6 @@
 # Knee Rehabilitation Device
 Ever been hurt your knee in your respective sport? look no further than this knee rehabilitation device. This device brings comfort to your injury and helps you recover faster. Heres how you can make your own!
-You should comment out all portions of your portfolio that you have not completed yet, as well as any instructions:
+You should comment out all portions of your portfolio that you have not completed yet, as well as any instructions TESTETSTETTTSTTETSTTE:
 ```HTML 
 <!--- This is an HTML comment in Markdown -->
 <!--- Anything between these symbols will not render on the published site -->
