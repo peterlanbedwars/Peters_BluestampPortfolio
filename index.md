@@ -51,7 +51,7 @@ The gyroscope and accelerometer are both built into one sensor board, and the co
 
 
 # Schematics 
-![Circuit diagram](B0C8D72A-7E5B-42B4-AAAA-FC1234.png)
+![Circuit diagram](B0C8D72A-7E5B-42B4-AAAA-FC6545CFBFA5.jpeg)
 
 # Code
 Here's where you'll put your code. The syntax below places it into a block of code. Follow the guide [here]([url](https://www.markdownguide.org/extended-syntax/)) to learn how to customize it to your project needs. 
