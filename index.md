@@ -1,6 +1,6 @@
 # Knee Rehabilitation Device
 Ever been hurt your knee in your respective sport? look no further than this knee rehabilitation device. This device brings comfort to your injury and helps you recover faster. Heres how you can make your own!
-You should comment out all portions of your portfolio that you have not completed yet, as well as any instructions TESTETSTETTTSTTETSTTE:
+You should comment out all portions of your portfolio that you have not completed yet, as well as any instructions :
 ```HTML 
 <!--- This is an HTML comment in Markdown -->
 <!--- Anything between these symbols will not render on the published site -->
@@ -54,6 +54,14 @@ The gyroscope and accelerometer are both built into one sensor board, and the co
 
 # Schematics 
 ![Circuit diagram](B0C8D72A-7E5B-42B4-AAAA-FC6545CFBFA5.jpeg)
+# Pictures
+![Circuit diagram](BC4A79E1-03E2-4525-9A25-0D26B3A6061A.jpg)
+
+![Circuit diagram](AEC5B65F-57F0-40B9-9E75-D83537D6E4FF.jpg)
+
+![Circuit diagram](5604CBB0-B997-4DD7-8B47-ABA32039D6A0.jpg)
+
+
 
 # Code
 
