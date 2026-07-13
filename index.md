@@ -50,7 +50,7 @@ The gyroscope and accelerometer are both built into one sensor board, and the co
 
 
 # Schematics 
-![Circuit diagram](B0C8D72A-7E5B-42B4-AAAA-FC6545CFBFA5.jpeg)
+![Circuit diagram](838629C6-5B70-4C8C-B480-3F60DCEC4EC7.png)
 # Pictures
 ![Circuit diagram](BC4A79E1-03E2-4525-9A25-0D26B3A6061A.jpg)
 
