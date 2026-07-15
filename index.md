@@ -424,10 +424,9 @@ void compareAngleToBaseline(int measuredAngle) {
 | Piezzo Buzzer | Buzzes when form is bad | $1.33 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://www.amazon.com/Stemedu-SFM-20B-Electric-DC3-24V-Continuous/dp/B0BFHBXKND/ref=sr_1_4?crid=61ZO1XM97XPB&keywords=piezo+buzzer&qid=1689572505&sprefix=piezo+buz%2Caps%2C236&sr=8-4)"> Link </a> |
 
 
-# Other Resources/Examples
-One of the best parts about Github is that you can view how other people set up their own work. Here are some past BSE portfolios that are awesome examples. You can view how they set up their portfolio, and you can view their index.md files to understand how they implemented different portfolio components.
-- [Example 1](https://trashytuber.github.io/YimingJiaBlueStamp/)
-- [Example 2](https://sviatil0.github.io/Sviatoslav_BSE/)
-- [Example 3](https://arneshkumar.github.io/arneshbluestamp/)
+Circuit set ups for each componenet
+If you dont understand how to hoop everything together via wiring or soldering on a bread board or pcb board use these links for circuit diagrams.
+- [peizo buzzer setup](https://learn.sparkfun.com/tutorials/sik-experiment-guide-for-arduino---v33/experiment-11-using-a-piezo-buzzer)
+- [Flex sensor explaination with circuit setup](https://learn.sparkfun.com/tutorials/flex-sensor-hookup-guide/all)
+- [Adafruit LSM6DS3TR-C + LIS3MDL set up with other adafruit but can be convereted to arduino](https://learn.adafruit.com/adafruit-lsm6ds3tr-c-lis3mdl-precision-9-dof-imu/arduino)
 
-To watch the BSE tutorial on how to create a portfolio, click here.
