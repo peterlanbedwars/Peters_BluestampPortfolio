@@ -424,7 +424,7 @@ void compareAngleToBaseline(int measuredAngle) {
 | Piezzo Buzzer | Buzzes when form is bad | $1.33 | <a href="https://www.amazon.com/Arduino-A000066-ARDUINO-UNO-R3/dp/B008GRTSV6/](https://www.amazon.com/Stemedu-SFM-20B-Electric-DC3-24V-Continuous/dp/B0BFHBXKND/ref=sr_1_4?crid=61ZO1XM97XPB&keywords=piezo+buzzer&qid=1689572505&sprefix=piezo+buz%2Caps%2C236&sr=8-4)"> Link </a> |
 
 
-#Circuit set ups for each componenet
+# Circuit set ups for each componenet
 
 If you dont understand how to hoop everything together via wiring or soldering on a bread board or pcb board use these links for circuit diagrams.
 - [peizo buzzer setup](https://learn.sparkfun.com/tutorials/sik-experiment-guide-for-arduino---v33/experiment-11-using-a-piezo-buzzer)
